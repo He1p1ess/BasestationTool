@@ -1,75 +1,69 @@
 # Basestation Tool (Rust)
 
-Select your Lighthouse stations and turn them on, put them in standby or send them to sleep over Bluetooth LE. Enable automatic wake-up to switch them on when you start SteamVR.
+Control Valve and HTC Lighthouse base stations individually or as a group over Bluetooth Low Energy (BLE). Turn stations on, switch them to standby or put them to sleep. You can also wake known stations when SteamVR starts or change a station's channel without starting SteamVR.
 
-[Download the Windows installer, portable EXE or Linux packages from GitHub Releases](https://github.com/He1p1ess/BasestationTool/releases/latest)
+Basestation Tool is a native Rust desktop application built with egui. Windows 11 and Linux share the same application core. The Linux Bluetooth backend uses btleplug and BlueZ. Most of the project code was generated with AI.
 
-Most of the project code was generated with AI. Ein Großteil des Projektcodes wurde mit KI generiert.
+## Installation (v0.1.0)
 
-Native Windows-11-Anwendung zur BLE-Steuerung von Valve/HTC Lighthouse Base Stations. Vollständige Rust-Neuentwicklung mit egui, ohne .NET-Laufzeit. Die Linux-Architektur verwendet denselben Anwendungskern und btleplug/BlueZ.
+[Download the Windows and Linux packages from GitHub Releases](https://github.com/He1p1ess/BasestationTool/releases/latest). Each release package has a SHA-256 checksum listed in `SHA256SUMS.txt`.
 
-## Installation (Version 0.1.0)
+| Platform | Package | How to launch |
+| --- | --- | --- |
+| Windows x64 | MSI installer | Double-click `Basestation-Tool-0.1.0-x64.msi`. It installs for the current user. Open **Basestation Tool** from the Start menu. The installer is unsigned. |
+| Windows x64 | Portable EXE | Save `Basestation-Tool-0.1.0-x64.exe` in a permanent folder and double-click it. If you move the executable or switch to the installed version, register SteamVR autostart again. |
+| Debian or Ubuntu amd64 | DEB | In the download folder, run `sudo apt install ./basestation-tool_0.1.0_amd64.deb`. Launch it from the application menu or run `basestation-tool`. |
+| Linux x86-64 | AppImage | Save the AppImage in a permanent folder. Run `chmod +x Basestation-Tool-0.1.0-x86_64.AppImage`, then `./Basestation-Tool-0.1.0-x86_64.AppImage`. If FUSE is unavailable, run `./Basestation-Tool-0.1.0-x86_64.AppImage --appimage-extract-and-run`. |
 
-- Windows x64: `dist/Basestation-Tool-0.1.0-x64.msi` per Doppelklick installieren. Die Installation gilt für den aktuellen Benutzer und legt einen Startmenüeintrag an. Die portable EXE bleibt unter `target/release/basestation-tool.exe` verfügbar.
-- Debian/Ubuntu amd64: im Paketordner `sudo apt install ./basestation-tool_0.1.0_amd64.deb` ausführen. Anschließend über das Anwendungsmenü oder mit `basestation-tool` starten.
-- Linux x86-64 ohne Installation: `dist/Basestation-Tool-0.1.0-x86_64.AppImage` an einem dauerhaften Ort ablegen, mit `chmod +x Basestation-Tool-0.1.0-x86_64.AppImage` ausführbar machen und mit `./Basestation-Tool-0.1.0-x86_64.AppImage` starten. Falls FUSE fehlt: `./Basestation-Tool-0.1.0-x86_64.AppImage --appimage-extract-and-run`. Benötigt eine grafische Linux-Sitzung, glibc ab 2.31 und die Systembibliotheken für Grafik, D-Bus und Bluetooth (BlueZ). Das Paket wurde entpackt und geprüft, aber nicht auf einem Linux-Desktop gestartet.
-- Prüfsummen aller Pakete: `dist/SHA256SUMS.txt`. Das MSI ist nicht signiert. Bei zuvor eingerichtetem SteamVR-Autostart nach dem Wechsel von der portablen zur installierten EXE den Autostart in den Einstellungen erneut registrieren.
+You need a Bluetooth LE adapter with working drivers. Linux also requires a graphical session, glibc 2.31 or later, graphics libraries, D-Bus and BlueZ.
 
-## Start
+## First launch
 
-Windows-EXE: **`target/release/basestation-tool.exe`**. Doppelklick startet die Anwendung. Ein Bluetooth-LE-Adapter und aktuelle Windows-Treiber sind erforderlich. Ein zweiter Start derselben Benutzerinstanz beendet sich sofort.
+Connect your stations to power, enable Bluetooth and open the app. By default, it scans for nearby stations and reads their status and channel. A normal launch only reads device data. Manual power and channel changes show a confirmation dialog listing the target stations. Automatic SteamVR power actions are off by default.
 
-Die neue Anwendung scannt standardmäßig automatisch und liest Status/Kanal. Sie sendet beim normalen Start **keine Power- oder Kanalbefehle**. Schreibaktionen benötigen eine Bestätigung mit der konkreten Zielliste. Automatische SteamVR-Poweraktionen sind standardmäßig ausgeschaltet.
+Only one instance runs per user. A second instance exits immediately.
 
-## Bedienung
+## Using the app
 
-Sprache und „Log anzeigen“ befinden sich in den Einstellungen rechts oben beim Zahnrad. Ein Namensklick wählt genau eine Station. Checkboxen ändern die Auswahl stationenweise. Bei genau einer ausgewählten Station erscheinen zusätzlich lokaler Name, Kanal und Diagnose. Nach einem Log- oder Diagnoseexport öffnet sich automatisch der Exportordner; der vollständige Dateipfad bleibt zusätzlich sichtbar.
+- **Find stations.** A scan lasts eight seconds and finishes with a status check. Automatic scanning runs every 60 seconds and can be turned off in Settings. While idle, the app checks status every 30 seconds.
+- **Select and control stations.** Click a station name to select it alone, or use the checkboxes to select a group. The highlighted rows and the names above the action bar show which stations will receive **On**, **Standby**, **Sleep** or **Refresh status**. The app captures the selection when you click the action.
+- **Manage one station.** Select exactly one station to edit its local display name, set its channel or open diagnostics. Renaming affects only the name shown in the app. On a supported LHB station, choose a channel from 1 to 16 and confirm. The app reads the channel back from the station and displays that value.
+- **Read diagnostics.** Inspect GATT services, characteristics, properties, hex values and validated text, including the manufacturer, model, serial number and firmware. You can refresh, select and copy text, or export the full report.
+- **Read signal strength.** RSSI shows the last signal strength observed during a scan, in dBm. Hover for the observation time. A dash means that no reading is available. RSSI is not a distance measurement.
+- **Arrange the table and log.** Click a column heading to sort and click again to reverse the order. Channel and RSSI sort numerically. Selections follow device IDs when rows move. Drag column boundaries to resize them, or scroll horizontally in a narrow window. With the log visible, drag the divider beneath the table to resize both areas. Increasing the window height gives the log more room.
+- **Inspect and export logs.** Search the live log, filter by level, clear it or save it. BLE debugging includes byte values. Technical log messages and GATT data use English in every interface language. The app keeps up to 2,000 entries in memory and rotates the current log plus four older files at about 2 MB each. Exporting a log or diagnostic report opens the destination folder and displays the full file path.
+- **Reset Bluetooth.** This closes the app's connections and reinitializes scanning. The system adapter stays enabled and Windows settings are preserved.
+- **Change preferences.** Open the gear in the upper-right corner for **Language**, **Show log**, appearance (system, dark or light), scanning, logging and SteamVR options. The interface supports German, English, French, Spanish and Italian. eframe remembers the window size and position.
 
-Ein Klick auf eine Spaltenüberschrift sortiert die Tabelle, ein weiterer kehrt die Reihenfolge um. Kanal und RSSI werden numerisch sortiert. Die ausgewählten Stationen bleiben an die Gerätekennung gebunden. Bei sichtbarem Log lässt sich die horizontale Trennlinie unter der Tabelle ziehen, um Platz zwischen Geräteliste und Log umzuverteilen. Zusätzliche Fensterhöhe vergrößert den Logbereich.
+## SteamVR integration
 
-- **Suchen:** acht Sekunden BLE-Scan, danach Statusabfrage. Weitere Suche automatisch alle 60 Sekunden, abschaltbar. Statusabfragen im Leerlauf alle 30 Sekunden.
-- **Tabelle:** Die markierten Zeilen zeigen die aktuelle Auswahl. Tabellen-Spaltengrenzen lassen sich ziehen; bei schmalen Fenstern horizontal scrollen.
-- **Einzelgerät / ausgewählte Geräte / alle Geräte:** eine gemeinsame Aktionsleiste für Ein, Standby, Sleep und Statusabfrage. Die Namen der Zielstationen stehen direkt über den Schaltflächen. Vor dem Schreiben zeigt ein Dialog die tatsächlichen Ziele. Die Zielmenge wird beim Auslösen festgehalten.
-- **Lokaler Name:** frei bearbeiten und speichern. Der Bluetooth-Name wird nicht verändert.
-- **Kanal:** 1–16 für das erkannte LHB-Profil. Der tatsächlich zurückgelesene Kanal wird angezeigt, nicht einfach der gewünschte Wert.
-- **Diagnose:** Services, Characteristics, Eigenschaften, Hexwerte und geprüfter Text, einschließlich Hersteller/Modell/Seriennummer/Firmware. Aktualisieren, Textauswahl/Kopieren und Gesamtexport.
-- **RSSI:** letzter beim Scan beobachteter dBm-Wert; Zeitpunkt im Tooltip. Ein fehlender Wert bleibt „—“. Keine Entfernungsberechnung und keine erfundenen Signalwerte.
-- **Bluetooth zurücksetzen:** beendet nur programminterne Verbindungen und initialisiert den Scan neu. Kein Deaktivieren des Adapters, keine Windows-Einstellungsänderung.
-- **Log:** Live-Anzeige mit Suche, Level-Filter, Clear und Save/Export. Technische Log-/GATT-Inhalte bleiben Englisch. BLE-Debug zeigt Bytewerte. Maximal 2.000 Einträge im Speicher; aktuelle Datei und vier rotierende Vorgänger mit ungefähr 2 MB je Datei.
-- **Einstellungen:** Deutsch, Englisch, Französisch, Spanisch und Italienisch; System/Dunkel/Hell, automatischer Scan, Logging, SteamVR. Fenstergröße/-position speichert eframe automatisch.
+1. Place the executable in its permanent location and start SteamVR.
+2. In **Settings**, enable **Automatically start with SteamVR**. The app saves this preference once OpenVR confirms registration. If registration fails, it displays the OpenVR error.
+3. To wake known stations as well, enable **Power on when SteamVR starts**. Under **When SteamVR exits**, choose **No action**, **Standby** or **Sleep**. These settings authorize power commands to all known stations.
+4. To disable autostart, clear **Automatically start with SteamVR** while SteamVR is running.
 
-## SteamVR
+**Close with SteamVR** applies to instances SteamVR launched through the manifest with `--steamvr`. An instance you opened manually stays open. The app waits for queued power actions before closing. A separate monitor watches the `vrserver` process without starting SteamVR itself.
 
-Die Anwendung verwendet die offizielle OpenVR-Registrierung: Application Manifest, `AddApplicationManifest`, `SetApplicationAutoLaunch`, anschließend `GetApplicationAutoLaunch`. Es werden keine Registry-Run-Einträge oder systemweiten Aufgaben eingerichtet.
+Registration uses an OpenVR application manifest and the calls `AddApplicationManifest`, `SetApplicationAutoLaunch` and `GetApplicationAutoLaunch`. This requires no registry startup entries or system-wide scheduled tasks. Although the manifest uses overlay registration, the app displays a desktop window.
 
-1. EXE an ihrem dauerhaften Ort ablegen und SteamVR starten.
-2. In Einstellungen **Automatisch mit SteamVR starten** aktivieren. Erfolg oder tatsächliche OpenVR-Fehler werden angezeigt; erst nach bestätigter Registrierung wird die Einstellung gespeichert.
-3. Zum Abschalten bei laufendem SteamVR denselben Haken entfernen.
+The app locates the installed OpenVR library through `openvrpaths.vrpath`. You can also provide an absolute library path in Settings. The usual Windows location within the Steam library is `SteamVR/bin/win64/openvr_api.dll`. The app uses the installed library without downloading a DLL.
 
-Die offizielle OpenVR-Bibliothek wird über `openvrpaths.vrpath` gefunden. Alternativ kann ihr absoluter Pfad angegeben werden, unter Windows üblicherweise `SteamVR/bin/win64/openvr_api.dll`. Es wird keine OpenVR-DLL aus dem Internet nachgeladen. Wird die EXE verschoben, Registrierung erneut aktivieren.
+## Files and settings
 
-**Mit SteamVR beenden** wirkt nur, wenn das Tool mit `--steamvr` durch das Manifest gestartet wurde. Eine manuell gestartete Instanz bleibt offen. Ein separater Monitor beobachtet `vrserver`, ohne SteamVR selbst zu starten.
+The app uses `directories::ProjectDirs` to locate the current user's configuration directory. Settings shows the exact path.
 
-Die Optionen „Bei SteamVR-Start einschalten“ und „Beim SteamVR-Ende Standby/Sleep“ autorisieren automatische echte Powerbefehle an bekannte Stationen. Die Endaktion ist eine exklusive Auswahl (keine Aktion/Standby/Sleep). Alle Automatik-Poweraktionen sind anfangs deaktiviert. Beim automatischen Schließen werden zuvor eingereihte Aktionen abgewartet.
+- Windows uses `%APPDATA%\BasestationTool\BasestationTool\config`.
+- Linux typically uses `~/.config/basestationtool`.
 
-Die OpenVR-Registrierung wurde am 20.10.2026 mit SteamVR 2.17.10 tatsächlich aktiviert, zurückgelesen und wieder deaktiviert. Der anschließende SteamVR-Neustart scheiterte am fehlenden Headset (`HmdNotFound`, 108); der tatsächliche Autostart bleibt daher bei betriebsbereiter VR-Sitzung zu prüfen. Das Manifest nutzt die Overlay-Registrierung; das Programm stellt ein Desktopfenster, kein VR-Overlay dar.
+`settings.json` stores known device IDs, local names and preferences. Before replacing it, the app creates `settings.previous.json`. If the JSON is invalid, the app displays an error and disables saving until you repair the file outside the app. Known stations appear offline at startup until the app gets a fresh status reading.
 
-## Dateien und Einstellungen
+The app writes logs to `logs/` and exports to `exports/` inside the user data directory. Logs and diagnostic reports can contain device addresses and serial numbers. The project's original reference files are kept separately.
 
-Benutzerbezogenes Konfigurationsverzeichnis über `directories::ProjectDirs`:
+For isolated tests, set `BASESTATION_DATA_DIR` to a different data directory. Launching with `--no-ble` disables scanning, reading and writing and marks the window accordingly. Simulated devices are available only through the unit-test transport.
 
-- Windows: `%APPDATA%\BasestationTool\BasestationTool\config` (der tatsächlich verwendete Pfad steht in Einstellungen).
-- Linux: gewöhnlich `~/.config/basestationtool`.
+## Building on Windows
 
-`settings.json` enthält bekannte IDs, Namen und Einstellungen. Vor dem Ersetzen entsteht `settings.previous.json`. Ungültiges JSON wird nicht überschrieben; die Oberfläche zeigt einen Fehler und deaktiviert das Speichern, bis die Datei außerhalb der Anwendung korrigiert wurde. Laufzeitstatus wird nicht als vermeintlich aktueller Zustand gespeichert. Bekannte Geräte starten offline.
-
-Neue Logs liegen unter `logs/`, Exporte unter `exports/` dieses Benutzerverzeichnisses. **Die alten Referenzdateien im Projekt bleiben unverändert.** Geräteadressen/Seriennummern können in Diagnosen und Logs enthalten sein.
-
-Für isolierte Tests kann `BASESTATION_DATA_DIR` ein anderes Datenverzeichnis festlegen. `--no-ble` verhindert Scan, Lesen und Schreiben vollständig; das Fenster kennzeichnet diesen Modus. Es werden dabei keine Geräte simuliert. Simulationen existieren ausschließlich im Unit-Test-Transport.
-
-## Windows-Build
-
-Voraussetzungen: Rust stable (hier Rust/Cargo 1.99.1), MSVC x64, Visual Studio Build Tools mit Desktopentwicklung C++ und Windows SDK. Cargo muss die in Cargo.lock festgelegten Abhängigkeiten herunterladen können.
+Use stable Rust, the x64 MSVC toolchain, Visual Studio Build Tools with the **Desktop development with C++** workload, and the Windows SDK. The documented build used Rust and Cargo 1.99.1. Cargo needs access to the dependencies pinned in `Cargo.lock`.
 
 ```powershell
 cargo fmt --check
@@ -80,11 +74,11 @@ cargo build --locked --release
 .\target\release\basestation-tool.exe
 ```
 
-Bei fehlendem Cargo im PATH: `%USERPROFILE%\.cargo\bin\cargo.exe` verwenden. Zum Ausführen der fertigen Anwendung sind weder Cargo noch .NET erforderlich; die üblichen Windows-/Grafiktreiber und gegebenenfalls die MSVC-Runtime müssen vorhanden sein.
+If Cargo is missing from `PATH`, use `%USERPROFILE%\.cargo\bin\cargo.exe`. Running the finished executable requires the usual Windows and graphics drivers and, where applicable, the MSVC runtime. Both Windows downloads run without Cargo or .NET installed.
 
-## Linux
+## Building on Linux
 
-Linux-x86-64 wurde auf Windows für GNU/Linux mit glibc 2.31 als Buildziel kompiliert. Das Debian-Paket und seine ELF-Datei wurden geprüft; Start der GUI, BlueZ und SteamVR sind auf Linux noch nicht praktisch getestet. Der gemeinsame Code nutzt plattformübergreifende Bibliotheken; native Abhängigkeiten müssen auf Linux installiert sein, z. B. unter Debian/Ubuntu:
+The distributed x86-64 packages were cross-compiled on Windows for GNU/Linux with a glibc 2.31 target. To build natively on Debian or Ubuntu, install Rust and the system dependencies, then build and launch the app.
 
 ```sh
 sudo apt install build-essential pkg-config libdbus-1-dev libudev-dev libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxkbcommon-dev libwayland-dev libegl1-mesa-dev bluez
@@ -92,34 +86,43 @@ cargo build --locked --release
 ./target/release/basestation-tool
 ```
 
-BlueZ/D-Bus müssen laufen und dem angemeldeten Benutzer Bluetooth-Zugriff erlauben (distributionsabhängige Policy). Die GUI nicht als root starten. Bei fehlenden Berechtigungen oder Adapterfehlern werden reale Backendfehler angezeigt. SteamVR benötigt eine Linux-Runtime mit `bin/linux64/libopenvr_api.so` und muss separat überprüft werden.
+Run the GUI as your regular desktop user. BlueZ and the system D-Bus must be running, and your distribution's policy must allow Bluetooth access for that user. The app reports backend errors for missing permissions or adapter failures. SteamVR integration requires a Linux runtime containing `bin/linux64/libopenvr_api.so`.
 
-## Architektur und Protokoll
+## Architecture and protocol
 
-| Modul | Aufgabe |
-|---|---|
-| `gui` | Oberfläche, Zielauswahl, Bestätigung, Anzeige |
-| `device` | stabile Identitäten und Zielmengen |
-| `ble` | tatsächlicher Adapter, Discovery, begrenzte Queue/Timeouts |
-| `protocol` | UUIDs, typsichere Befehle, Status-/Kanalvalidierung |
-| `control` | unabhängig testbare Schreib-/Rücklesetransaktionen |
-| `diagnostics` | Hex-/Textvalidierung und Standardinformationen |
-| `config` | dauerhafte Benutzereinstellungen |
-| `logging` | begrenzte Anzeige, Dateirotation und Exporte |
-| `steamvr` | OpenVR-ABI und Prozessüberwachung |
+| Module | Responsibility |
+| --- | --- |
+| `gui` | Interface, target selection and confirmation dialogs |
+| `device` | Stable device identities and target sets |
+| `ble` | Adapter access, discovery, bounded command queue and timeouts |
+| `protocol` | UUIDs, typed commands, status and channel validation |
+| `control` | Independently testable write and readback operations |
+| `diagnostics` | Hex and text validation, standard device information |
+| `config` | Persistent user preferences |
+| `logging` | Bounded live log, file rotation and exports |
+| `steamvr` | OpenVR ABI and process monitoring |
 
-Power-Service `00001523-1212-efde-1523-785feabcd124`, Power-Characteristic `00001525-1212-efde-1523-785feabcd124`: Sleep `00`, Standby `02`, On **`01`**, genau ein Byte ohne GATT-Antwort. Korrektur nach Prüfung der tatsächlichen Button-Aufrufer in der alten EXE: `0B` ist ein gelesener Wert, nicht der Einschaltbefehl. Die gemeldeten Wachwerte `01`, `09`, `0B` werden mit Rohbyte als „Ein gemeldet“ angezeigt; dies bestätigt keine physische Laser-/Motorbereitschaft. Nach einer Sekunde wird gelesen, maximal drei Leseversuche. Channel-Characteristic `00001524-1212-efde-1523-785feabcd124`: Byte 1–16 mit GATT-Antwort, danach Rücklesen. Schreibbefehle werden nicht automatisch erneut gesendet. Andere Statusbytes bleiben Unknown.
+The power service UUID is `00001523-1212-efde-1523-785feabcd124`. The app writes a single byte to the power characteristic, `00001525-1212-efde-1523-785feabcd124`, using a GATT write without response.
 
-Nur das aus den Referenzen bekannte LHB-Profil wird beschreibbar. Andere Generationen und wechselnde Privacy-Adressen sind nicht automatisch kompatibel. Die Identität verwendet Betriebssystempräfix und Backend-PeripheralId, niemals eine Service-UUID oder einen lokalen Namen. Identitätswechsel werden nicht automatisch zusammengeführt.
+| Command | Byte (hex) |
+| --- | --- |
+| On | `01` |
+| Standby | `02` |
+| Sleep | `00` |
 
-## Abnahme und bekannte Grenzen
+The app waits one second before reading back the state and makes up to three read attempts. The station can report `01`, `09` or `0B` as awake. The display includes the raw byte. A reported awake state alone cannot confirm that the motor and laser are ready. Checking the original executable's button handlers confirmed that the wake command is `01`. The `0B` byte observed in diagnostics was a readback value. Unrecognized status bytes appear as unknown.
 
-Siehe `docs/ANALYSE.md` für Quellen/Evidenz und `docs/TESTS.md` für Prüfungen und offene Hardwaretests. Die Windows-Release-EXE wurde an drei echten LHB-Stationen geprüft.
+For channel changes, the app writes one byte (1–16) to `00001524-1212-efde-1523-785feabcd124` using a GATT write with response, then reads the channel back. The app never automatically repeats a write.
 
-- Einzel-, Auswahl- und Gesamtsteuerung sowie Kanäle 1/5/16 wurden nach Freigabe real geschrieben und zurückgelesen. **Die damalige On-Prüfung war kein physischer Funktionsnachweis:** Der Besitzer meldete fehlende Betriebsbereitschaft trotz 0B. Das Einschaltbyte wurde inzwischen auf das in der alten EXE belegte 01 korrigiert; ein erneuter physischer Einschaltcheck steht aus. Sleep/Standby funktionieren laut Besitzer.
-- Power-Schreiben ohne GATT-Antwort funktioniert an den drei geprüften Stationen trotz fehlender WriteWithoutResponse-Eigenschaft. Andere Geräte-/Treiberkombinationen bleiben separat zu prüfen.
-- Ein Adapter wird automatisch ausgewählt. Eine Mehradapter-Auswahl ist derzeit nicht enthalten.
-- Spalten sind anpassbar, jedoch nicht einzeln ausblendbar. Keine automatische Zusammenführung wechselnder BLE-Adressen.
-- SteamVR-Registrierung erfolgreich getestet und wieder deaktiviert; tatsächlicher Autostart, Ende-/Power-Automatik und Linux-Laufzeit benötigen weitere praktische Abnahme.
+Writing is enabled only for the recognized LHB profile. Device identity combines the operating-system prefix with the backend's `PeripheralId`. A service UUID or local name cannot identify an individual station. Other hardware generations and rotating BLE privacy addresses may require separate support. The app keeps changed identities separate.
 
-Primärquellen: [btleplug API](https://docs.rs/btleplug/0.13.5/btleplug/api/trait.Peripheral.html), [eframe API](https://docs.rs/eframe/0.37.0/eframe/), [Valve OpenVR Header](https://github.com/ValveSoftware/openvr/blob/master/headers/openvr_capi.h).
+## Testing and known limitations
+
+The Windows release executable was tested with three physical LHB stations. The project includes a [protocol analysis](docs/ANALYSE.md) and [detailed test results](docs/TESTS.md), both in German.
+
+- **Power and channels.** Hardware tests exercised single-station, selected-group and all-station commands and verified channel readback on channels 1, 5 and 16. An early power-on test returned `0B` while the station remained inactive. The wake command was corrected to `01`. The owner subsequently reported that power-on worked and had also confirmed sleep and standby.
+- **Adapter and device support.** All three tested stations accepted power writes without response even though they did not advertise the `WriteWithoutResponse` property. Other device and driver combinations still need testing. The app selects one adapter automatically. Manual adapter selection and per-column hiding are currently unavailable.
+- **SteamVR.** On October 20, 2026, registration was enabled, verified and disabled again with SteamVR 2.17.10. A subsequent SteamVR restart returned `HmdNotFound` (108) because no headset was connected. End-to-end testing of automatic launch, shutdown and power actions still requires a working VR session.
+- **Linux.** The Debian package, its ELF executable and the AppImage were inspected. The Linux GUI, Bluetooth operations and SteamVR integration still need testing on a Linux desktop.
+
+Technical references include the [btleplug API](https://docs.rs/btleplug/0.13.5/btleplug/api/trait.Peripheral.html), the [eframe API](https://docs.rs/eframe/0.37.0/eframe/) and [Valve's OpenVR header](https://github.com/ValveSoftware/openvr/blob/master/headers/openvr_capi.h).
