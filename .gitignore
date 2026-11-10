@@ -1,0 +1,12 @@
+/target/
+/tools/ilspy/
+/tools/analysis/
+
+/Logs/
+/Screenshots/
+/BaseStation Tool Old/
+/docs/*.json
+/docs/*.txt
+/docs/*.log
+/dist/*-website.zip
+/website/.openai/

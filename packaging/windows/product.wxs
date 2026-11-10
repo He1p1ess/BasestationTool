@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="Basestation Tool" Language="1033" Version="$(var.Version)"
+           Manufacturer="Basestation Tool" UpgradeCode="7FBA6CCD-34CC-49FC-805B-05E4017B53A7">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perUser" Platform="x64"/>
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Basestation Tool is already installed."/>
+    <MediaTemplate EmbedCab="yes"/>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="AppDir" Name="Basestation Tool">
+          <Component Id="App" Guid="B68AD51B-425C-4A89-B37A-1C2DEDB2A31C" Win64="yes">
+            <File Id="AppExe" Source="$(var.Executable)" Name="basestation-tool.exe"/>
+            <RegistryValue Root="HKCU" Key="Software\BasestationTool\Installer" Name="Installed" Type="integer" Value="1" KeyPath="yes"/>
+            <Shortcut Id="Launch" Directory="ProgramMenuFolder" Name="Basestation Tool" Target="[#AppExe]" WorkingDirectory="AppDir"/><RemoveFolder Id="RemoveAppFolder" On="uninstall"/>
+          </Component>
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder"/>
+    </Directory>
+    <Feature Id="Main" Title="Basestation Tool" Level="1">
+      <ComponentRef Id="App"/>
+    </Feature>
+  </Product>
+</Wix>
+

@@ -1,0 +1,27 @@
+[package]
+name = "basestation-tool"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+hardware-tests = []
+
+[dependencies]
+anyhow = "1"
+btleplug = "0.13"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts", "persistence", "x11", "wayland", "clipboard"] }
+egui_extras = "0.37"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+directories = "6"
+uuid = "1"
+chrono = "0.4"
+libloading = "0.8"
+fs2 = "0.4"
+futures-util = "0.3"
+sysinfo = { version = "0.39", default-features = false, features = ["system"] }
+
+[profile.release]
+strip = true
+

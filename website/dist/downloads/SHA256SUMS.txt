@@ -1,0 +1,4 @@
+a921ca85ccf117b9167288ed420a26838b69489a0838cdc9a4a3c62c7e6ba0a5  basestation-tool_0.1.0_amd64.deb
+af6dc9956b817d4a44a43437dda94e47038fb01531e22ff1b11a732cca15d231  Basestation-Tool-0.1.0-x64.msi
+fe2aa424680b1cf54afbc56ac0b6cf25947115ba40bdd1ebeb34cb15095fed23  Basestation-Tool-0.1.0-x86_64.AppImage
+e8e79e530b4b5bc80f3787d39233883dcf0b4664948e38451d01fb14339d37db  Basestation-Tool-0.1.0-x64.exe
