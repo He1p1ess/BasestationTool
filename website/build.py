@@ -1,4 +1,4 @@
-"""Generate five static HTML pages; pass the final public URL when self-hosting."""
+"""Generate the static pages for basestationtool.com or an alternate HTTPS origin."""
 import argparse, csv, html, shutil
 from pathlib import Path
 from urllib.parse import urljoin
@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 root = Path(__file__).resolve().parent
 out = root / "dist"
 ap = argparse.ArgumentParser()
-ap.add_argument("--base-url", required=True)
+ap.add_argument("--base-url", default="https://www.basestationtool.com/")
 base = ap.parse_args().base_url.rstrip("/") + "/"
 if not base.startswith("https://"):
     raise ValueError("Use the actual HTTPS publication URL")
