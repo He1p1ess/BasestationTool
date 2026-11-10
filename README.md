@@ -2,7 +2,9 @@
 
 Select your Lighthouse stations and turn them on, put them in standby or send them to sleep over Bluetooth LE. Enable automatic wake-up to switch them on when you start SteamVR.
 
-[Portable Windows EXE and Linux packages](website/dist/downloads)
+[Download the Windows installer, portable EXE or Linux packages from GitHub Releases](https://github.com/He1p1ess/BasestationTool/releases/latest)
+
+Most of the project code was generated with AI. Ein Großteil des Projektcodes wurde mit KI generiert.
 
 Native Windows-11-Anwendung zur BLE-Steuerung von Valve/HTC Lighthouse Base Stations. Vollständige Rust-Neuentwicklung mit egui, ohne .NET-Laufzeit. Die Linux-Architektur verwendet denselben Anwendungskern und btleplug/BlueZ.
 
