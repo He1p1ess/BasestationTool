@@ -15,10 +15,7 @@ fn acceptance_ids() -> Result<[String; 3]> {
         .collect::<Vec<_>>()
         .try_into()
         .map_err(|_| anyhow::anyhow!("Expected exactly three station IDs"))?;
-    if ids.iter().any(String::is_empty)
-        || ids[0] == ids[1]
-        || ids[1] == ids[2]
-        || ids[0] == ids[2]
+    if ids.iter().any(String::is_empty) || ids[0] == ids[1] || ids[1] == ids[2] || ids[0] == ids[2]
     {
         bail!("Expected three distinct, non-empty station IDs");
     }

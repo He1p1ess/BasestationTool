@@ -72,6 +72,9 @@ impl Worker {
                                 backend.log("Error", format!("Reset: {e:#}"));
                             }
                         }
+                        Request::Run(ids, Action::Identify) if ids.len() != 1 => {
+                            backend.log("Error", "Identify requires exactly one station".into());
+                        }
                         Request::Run(ids, action) => {
                             backend
                                 .log("Info", format!("Group {action:?}: {} device(s)", ids.len()));
@@ -357,15 +360,61 @@ impl Backend {
             }
             self.devices.get_mut(id).unwrap().diagnosis = report;
         }
-        let power = self.characteristic(&p, protocol::POWER).await?;
-        let channel = self.characteristic(&p, protocol::CHANNEL).await?;
         // The observed LHB family supports this profile; other generations are read-only.
         let supported = self.devices[id].known.name.starts_with("LHB-");
         self.devices.get_mut(id).unwrap().supported = supported;
         if action.writes() && !supported {
             bail!("Unverified Lighthouse generation: control disabled");
         }
+        let power = self.characteristic(&p, protocol::POWER).await?;
+        let channel = self.characteristic(&p, protocol::CHANNEL).await?;
         match action {
+            Action::Identify => {
+                let identify = self.characteristic(&p, protocol::IDENTIFY).await?;
+                if !identify.properties.contains(CharPropFlags::WRITE) {
+                    bail!("Identify characteristic does not support WriteWithResponse");
+                }
+                let before = Status::parse(&self.read(&p, &power).await?)?;
+                let restore = match before {
+                    Status::Sleep => Some(protocol::PowerCommand::Sleep),
+                    Status::Standby => Some(protocol::PowerCommand::Standby),
+                    Status::On(_) => None,
+                    _ => bail!("Cannot identify safely: current power state is {before}"),
+                };
+                if restore.is_some()
+                    && !power
+                        .properties
+                        .intersects(CharPropFlags::WRITE_WITHOUT_RESPONSE | CharPropFlags::WRITE)
+                {
+                    bail!("Cannot restore power state: power characteristic is not writable");
+                }
+                let blink = bounded(p.write(&identify, &[0x01], WriteType::WithResponse)).await;
+                if let Some(command) = restore {
+                    // The initial readback can still report Sleep while Identify wakes the motor.
+                    // Allow the blink and measured spin-up interval to finish before restoring.
+                    self.devices.get_mut(id).unwrap().status = Status::Unavailable;
+                    self.log(
+                        "Info",
+                        format!("{id}: waiting to restore {command:?} after identify"),
+                    );
+                    tokio::time::sleep(Duration::from_secs(15)).await;
+                    let io = GattTransport {
+                        backend: self,
+                        peripheral: &p,
+                        power: &power,
+                        channel: &channel,
+                    };
+                    let outcome = crate::control::power(&io, command, Duration::from_secs(1))
+                        .await
+                        .with_context(|| format!("Failed to restore {command:?} after identify"))?;
+                    self.devices.get_mut(id).unwrap().status = outcome.observed;
+                    if !outcome.confirmed {
+                        bail!("Could not confirm {command:?} after identify");
+                    }
+                }
+                blink.context("Identify write was not acknowledged")?;
+                self.log("Info", format!("{id}: identify blink request acknowledged"));
+            }
             Action::Power(cmd) => {
                 if !power
                     .properties
@@ -379,7 +428,15 @@ impl Backend {
                 {
                     self.log("Warning",format!("{id}: WriteWithoutResponse not advertised; using source-confirmed legacy command mode"));
                 }
-                self.devices.get_mut(id).unwrap().status = Status::Unavailable;
+                let device = self.devices.get_mut(id).unwrap();
+                device.wake_started = match (cmd, &device.status) {
+                    (protocol::PowerCommand::On, Status::Sleep | Status::Standby) => {
+                        Some(std::time::Instant::now())
+                    }
+                    (protocol::PowerCommand::On, _) => device.wake_started,
+                    _ => None,
+                };
+                device.status = Status::Unavailable;
                 self.publish(id);
                 let io = GattTransport {
                     backend: self,
@@ -428,6 +485,9 @@ impl Backend {
         let actual_channel = Channel::parse(&self.read(&p, &channel).await?);
         let d = self.devices.get_mut(id).unwrap();
         d.status = status?;
+        if matches!(d.status, Status::On(11) | Status::Sleep | Status::Standby) {
+            d.wake_started = None;
+        }
         d.channel = Some(actual_channel?.byte());
         d.connected = true;
         d.online = true;
@@ -488,6 +548,55 @@ impl crate::control::Transport for GattTransport<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "hardware-tests")]
+    #[tokio::test]
+    #[ignore = "sends an identify command to the specified physical station"]
+    async fn identify_one_station() -> Result<()> {
+        let id = std::env::var("BASESTATION_IDENTIFY_ID")?;
+        let (events, _rx) = std::sync::mpsc::channel();
+        let mut backend = Backend {
+            adapter: None,
+            peripherals: BTreeMap::new(),
+            devices: BTreeMap::new(),
+            events,
+        };
+        backend.scan().await?;
+        backend.perform(&id, Action::Refresh).await?;
+        if std::env::var("BASESTATION_IDENTIFY_TEST_FROM_SLEEP").as_deref() == Ok("1") {
+            backend
+                .perform(&id, Action::Power(protocol::PowerCommand::Sleep))
+                .await?;
+            tokio::time::sleep(Duration::from_secs(12)).await;
+            backend.perform(&id, Action::Refresh).await?;
+            anyhow::ensure!(
+                backend.devices[&id].status == Status::Sleep,
+                "Expected sleep baseline"
+            );
+        }
+        let before = backend.devices[&id].clone();
+        println!(
+            "Identify {}: initial status {}, channel {:?}",
+            before.known.name, before.status, before.channel
+        );
+        let result = backend.perform(&id, Action::Identify).await;
+        if result.is_ok() {
+            println!("Identify completed; checking again in 30 seconds");
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            backend.perform(&id, Action::Refresh).await?;
+            let after = &backend.devices[&id];
+            println!(
+                "After identify: status {}, channel {:?}",
+                after.status, after.channel
+            );
+            anyhow::ensure!(
+                after.status == before.status && after.channel == before.channel,
+                "Identify changed the station state"
+            );
+        }
+        backend.disconnect().await;
+        result
+    }
+
     #[tokio::test]
     async fn missing_peripherals_are_reported_individually() {
         let (events, rx) = std::sync::mpsc::channel();

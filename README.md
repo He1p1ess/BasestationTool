@@ -4,16 +4,16 @@ Control Valve and HTC Lighthouse base stations individually or as a group over B
 
 Basestation Tool is a native Rust desktop application built with egui. Windows 11 and Linux share the same application core. The Linux Bluetooth backend uses btleplug and BlueZ. Most of the project code was generated with AI.
 
-## Installation (v0.1.0)
+## Installation (v0.1.1)
 
 [Download the Windows and Linux packages from GitHub Releases](https://github.com/He1p1ess/BasestationTool/releases/latest). Each release package has a SHA-256 checksum listed in `SHA256SUMS.txt`.
 
 | Platform | Package | How to launch |
 | --- | --- | --- |
-| Windows x64 | MSI installer | Double-click `Basestation-Tool-0.1.0-x64.msi`. It installs for the current user. Open **Basestation Tool** from the Start menu. The installer is unsigned. |
-| Windows x64 | Portable EXE | Save `Basestation-Tool-0.1.0-x64.exe` in a permanent folder and double-click it. If you move the executable or switch to the installed version, register SteamVR autostart again. |
-| Debian or Ubuntu amd64 | DEB | In the download folder, run `sudo apt install ./basestation-tool_0.1.0_amd64.deb`. Launch it from the application menu or run `basestation-tool`. |
-| Linux x86-64 | AppImage | Save the AppImage in a permanent folder. Run `chmod +x Basestation-Tool-0.1.0-x86_64.AppImage`, then `./Basestation-Tool-0.1.0-x86_64.AppImage`. If FUSE is unavailable, run `./Basestation-Tool-0.1.0-x86_64.AppImage --appimage-extract-and-run`. |
+| Windows x64 | MSI installer | Double-click `Basestation-Tool-0.1.1-x64.msi`. It installs for the current user. Open **Basestation Tool** from the Start menu. The installer is unsigned. |
+| Windows x64 | Portable EXE | Save `Basestation-Tool-0.1.1-x64.exe` in a permanent folder and double-click it. If you move the executable or switch to the installed version, register SteamVR autostart again. |
+| Debian or Ubuntu amd64 | DEB | In the download folder, run `sudo apt install ./basestation-tool_0.1.1_amd64.deb`. Launch it from the application menu or run `basestation-tool`. |
+| Linux x86-64 | AppImage | Save the AppImage in a permanent folder. Run `chmod +x Basestation-Tool-0.1.1-x86_64.AppImage`, then `./Basestation-Tool-0.1.1-x86_64.AppImage`. If FUSE is unavailable, run `./Basestation-Tool-0.1.1-x86_64.AppImage --appimage-extract-and-run`. |
 
 You need a Bluetooth LE adapter with working drivers. Linux also requires a graphical session, glibc 2.31 or later, graphics libraries, D-Bus and BlueZ.
 
@@ -27,6 +27,7 @@ Only one instance runs per user. A second instance exits immediately.
 
 - **Find stations.** A scan lasts eight seconds and finishes with a status check. Automatic scanning runs every 60 seconds and can be turned off in Settings. While idle, the app checks status every 30 seconds.
 - **Select and control stations.** Click a station name to select it alone, or use the checkboxes to select a group. The highlighted rows and the names above the action bar show which stations will receive **On**, **Standby**, **Sleep** or **Refresh status**. The app captures the selection when you click the action.
+- **Identify a station.** Select exactly one station and choose **Identify** to blink its LED. If it was in sleep or standby, the tool restores that state after 15 seconds and checks the readback.
 - **Manage one station.** Select exactly one station to edit its local display name, set its channel or open diagnostics. Renaming affects only the name shown in the app. On a supported LHB station, choose a channel from 1 to 16 and confirm. The app reads the channel back from the station and displays that value.
 - **Read diagnostics.** Inspect GATT services, characteristics, properties, hex values and validated text, including the manufacturer, model, serial number and firmware. You can refresh, select and copy text, or export the full report.
 - **Read signal strength.** RSSI shows the last signal strength observed during a scan, in dBm. Hover for the observation time. A dash means that no reading is available. RSSI is not a distance measurement.
@@ -110,7 +111,7 @@ The power service UUID is `00001523-1212-efde-1523-785feabcd124`. The app writes
 | Standby | `02` |
 | Sleep | `00` |
 
-The app waits one second before reading back the state and makes up to three read attempts. The station can report `01`, `09` or `0B` as awake. The display includes the raw byte. A reported awake state alone cannot confirm that the motor and laser are ready. Checking the original executable's button handlers confirmed that the wake command is `01`. The `0B` byte observed in diagnostics was a readback value. Unrecognized status bytes appear as unknown.
+The app waits one second before reading back the state and makes up to three read attempts. The station can report `01`, `09` or `0B` as awake. The display includes the raw byte. A reported awake state alone cannot confirm that the motor and laser are ready. On one tested station waking from sleep, the readback progressed through `08`, `01` and `09` before settling at `0B` roughly 11 seconds after the command. During a wake from a known sleep or standby state, the app labels `01` and `09` as **Starting up** and briefly refreshes the station more frequently. Checking the original executable's button handlers confirmed that the wake command is `01`. The `0B` byte observed in diagnostics was a readback value. Unrecognized status bytes appear as unknown.
 
 For channel changes, the app writes one byte (1–16) to `00001524-1212-efde-1523-785feabcd124` using a GATT write with response, then reads the channel back. The app never automatically repeats a write.
 

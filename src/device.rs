@@ -13,6 +13,7 @@ pub struct KnownDevice {
 pub struct Device {
     pub known: KnownDevice,
     pub status: Status,
+    pub wake_started: Option<std::time::Instant>,
     pub channel: Option<u8>,
     pub rssi: Option<i16>,
     pub seen: Option<String>,
@@ -24,6 +25,10 @@ pub struct Device {
     pub diagnosis: String,
 }
 impl Device {
+    pub fn spinning_up(&self) -> bool {
+        self.online && self.wake_started.is_some() && matches!(self.status, Status::On(1 | 9))
+    }
+
     pub fn display_name(&self) -> &str {
         if self.known.alias.trim().is_empty() {
             &self.known.name
@@ -36,12 +41,13 @@ impl Device {
 pub enum Action {
     Refresh,
     Diagnose,
+    Identify,
     Power(PowerCommand),
     Channel(Channel),
 }
 impl Action {
     pub fn writes(self) -> bool {
-        matches!(self, Self::Power(_) | Self::Channel(_))
+        matches!(self, Self::Power(_) | Self::Channel(_) | Self::Identify)
     }
 }
 pub enum Scope<'a> {

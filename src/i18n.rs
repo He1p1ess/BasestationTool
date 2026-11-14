@@ -20,6 +20,20 @@ impl Language {
     }
 }
 pub mod strings {
+    pub const IDENTIFY: [&str; 5] = [
+        "Identifizieren",
+        "Identify",
+        "Identifier",
+        "Identificar",
+        "Identifica",
+    ];
+    pub const SPINNING_UP: [&str; 5] = [
+        "Fährt hoch",
+        "Starting up",
+        "Démarrage en cours",
+        "Arrancando",
+        "Avvio in corso",
+    ];
     pub const RUNNING: [&str; 5] = ["Aktiv", "Running", "Actif", "Activo", "Attivo"];
     pub const STOPPED: [&str; 5] = ["Inaktiv", "Stopped", "Inactif", "Inactivo", "Inattivo"];
     pub const EXPORTED: [&str; 5] = [
@@ -342,13 +356,7 @@ pub mod strings {
         "No disponible",
         "Non disponibile",
     ];
-    pub const ON_REPORTED: [&str; 5] = [
-        "Ein gemeldet",
-        "On reported",
-        "Signalée allumée",
-        "Indica encendida",
-        "Segnalata accesa",
-    ];
+    pub const ON_STATUS: [&str; 5] = ["Ein", "On", "Allumée", "Encendida", "Accesa"];
     pub const UNKNOWN: [&str; 5] = [
         "Unbekannt",
         "Unknown",

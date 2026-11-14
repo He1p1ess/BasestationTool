@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 pub const SERVICE: Uuid = Uuid::from_u128(0x00001523_1212_efde_1523_785feabcd124);
 pub const POWER: Uuid = Uuid::from_u128(0x00001525_1212_efde_1523_785feabcd124);
+pub const IDENTIFY: Uuid = Uuid::from_u128(0x00008421_1212_efde_1523_785feabcd124);
 pub const CHANNEL: Uuid = Uuid::from_u128(0x00001524_1212_efde_1523_785feabcd124);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,7 +51,7 @@ impl Status {
 impl std::fmt::Display for Status {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::On(b) => write!(f, "On (reported 0x{b:02X})"),
+            Self::On(b) => write!(f, "On (0x{b:02X})"),
             Self::Unknown(b) => write!(f, "Unknown (0x{b:02X})"),
             s => write!(f, "{s:?}"),
         }

@@ -39,6 +39,7 @@ pub struct App {
     registration: Option<std::sync::mpsc::Receiver<Result<bool, String>>>,
     last_scan: Instant,
     last_refresh: Instant,
+    last_wake_refresh: Instant,
     no_ble: bool,
     save_allowed: bool,
     table_height: f32,
@@ -100,6 +101,7 @@ impl App {
             registration: None,
             last_scan: Instant::now(),
             last_refresh: Instant::now(),
+            last_wake_refresh: Instant::now(),
             no_ble,
             save_allowed,
             table_height: 180.0,
@@ -260,6 +262,21 @@ impl App {
                     device::targets(&self.devices, Scope::All),
                     Action::Refresh,
                 ));
+            } else if self.last_wake_refresh.elapsed() >= Duration::from_secs(2) {
+                self.last_wake_refresh = Instant::now();
+                let ids: Vec<_> = self
+                    .devices
+                    .iter()
+                    .filter(|(_, d)| {
+                        d.spinning_up()
+                            && d.wake_started
+                                .is_some_and(|t| t.elapsed() < Duration::from_secs(20))
+                    })
+                    .map(|(id, _)| id.clone())
+                    .collect();
+                if !ids.is_empty() {
+                    self.send(Request::Run(ids, Action::Refresh));
+                }
             }
         }
         ctx.request_repaint_after(Duration::from_millis(250));
@@ -297,6 +314,12 @@ impl App {
                     if ui.button(label).clicked() {
                         self.action(ids.to_vec(), Action::Power(command));
                     }
+                }
+                if ui
+                    .add_enabled(ids.len() == 1, egui::Button::new(lang.text(s::IDENTIFY)))
+                    .clicked()
+                {
+                    self.action(ids.to_vec(), Action::Identify);
                 }
                 if ui.button(lang.text(s::REFRESH_STATUS)).clicked() {
                     self.action(ids.to_vec(), Action::Refresh);
@@ -508,6 +531,7 @@ impl App {
                             .to_owned(),
                         Action::Channel(c) => format!("{} {}", lang.text(s::CHANNEL), c.byte()),
                         Action::Refresh => lang.text(s::REFRESH_STATUS).into(),
+                        Action::Identify => lang.text(s::IDENTIFY).into(),
                         Action::Diagnose => lang.text(s::DIAGNOSTICS).into(),
                     },
                     ids.len(),
@@ -775,7 +799,11 @@ impl eframe::App for App {
                                     ui.label(&d.known.name);
                                 });
                                 row.col(|ui| {
-                                    let text = if d.busy {
+                                    let text = if let Status::On(b) = d.status
+                                        && d.spinning_up()
+                                    {
+                                        format!("{} (0x{b:02X})", lang.text(s::SPINNING_UP))
+                                    } else if d.busy {
                                         lang.text(s::CHECKING).to_owned()
                                     } else if !d.online {
                                         lang.text(s::OFFLINE).into()
@@ -783,7 +811,7 @@ impl eframe::App for App {
                                         match d.status {
                                             Status::Unavailable => lang.text(s::UNAVAILABLE).into(),
                                             Status::On(b) => {
-                                                format!("{} (0x{b:02X})", lang.text(s::ON_REPORTED))
+                                                format!("{} (0x{b:02X})", lang.text(s::ON_STATUS))
                                             }
                                             Status::Unknown(b) => {
                                                 format!("{} (0x{b:02X})", lang.text(s::UNKNOWN))
