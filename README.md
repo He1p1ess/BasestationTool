@@ -119,7 +119,7 @@ Writing is enabled only for the recognized LHB profile. Device identity combines
 
 ## Testing and known limitations
 
-The Windows release executable was tested with three physical LHB stations. The project includes a [protocol analysis](docs/ANALYSE.md) and [detailed test results](docs/TESTS.md), both in German.
+The Windows release executable was tested with three physical LHB stations. The project includes a [protocol analysis](docs/ANALYSE.md) and [detailed test results](docs/TESTS.md).
 
 - **Power and channels.** Hardware tests exercised single-station, selected-group and all-station commands and verified channel readback on channels 1, 5 and 16. An early power-on test returned `0B` while the station remained inactive. The wake command was corrected to `01`. The owner subsequently reported that power-on worked and had also confirmed sleep and standby.
 - **Adapter and device support.** All three tested stations accepted power writes without response even though they did not advertise the `WriteWithoutResponse` property. Other device and driver combinations still need testing. The app selects one adapter automatically. Manual adapter selection and per-column hiding are currently unavailable.
