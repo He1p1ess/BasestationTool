@@ -96,3 +96,7 @@ Local evidence includes `steamvr-runtime-test-20261020.log` (relevant runtime ex
 - Physical signal or power loss, a disabled adapter, missing services and real timeouts. Simulated tests covered per-device error isolation.
 - Persistence of a real device's local alias across restarts. Automated tests covered serialization and stable identities.
 - Linux builds and runtime behavior, and other Lighthouse generations. Linux packages were built and verified in later releases. Linux desktop operation remains a separate test.
+
+## Release 0.1.2 (2026-11-20)
+
+Formatting, all 15 unit tests and Clippy (all targets, hardware-tests feature) passed. Windows and Linux release builds succeeded. WiX validated the per-user MSI (expected ICE91 warning). The DEB binary was compared with the Linux build, and the AppImage packer verified its extracted payload and links. All five website languages were checked for current download URLs and retained changelog history. Linux desktop/Bluetooth operation was not tested for this release. No hardware commands were sent during packaging.

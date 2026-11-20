@@ -37,7 +37,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             devices: vec![],
-            language: Language::De,
+            language: Language::En,
             theme: 0,
             steam_autostart: false,
             close_with_steam: false,
@@ -112,10 +112,12 @@ mod tests {
     #[test]
     fn automatic_power_is_opt_in() {
         let default = Config::default();
+        assert_eq!(default.language, Language::En);
         assert!(!default.steam_on);
         assert_eq!(default.steam_exit, None);
         assert!(!default.steam_autostart);
         let migrated: Config = serde_json::from_str("{}").unwrap();
+        assert_eq!(migrated.language, Language::En);
         assert!(!migrated.steam_on);
         assert_eq!(migrated.steam_exit, None);
     }

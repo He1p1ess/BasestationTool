@@ -1,3 +1,4 @@
+use crate::appearance::{self, Icon};
 use crate::i18n::{Language, strings as s};
 use crate::{
     ble::{Event, Request, Worker},
@@ -42,7 +43,6 @@ pub struct App {
     last_wake_refresh: Instant,
     no_ble: bool,
     save_allowed: bool,
-    table_height: f32,
     sort_column: usize,
     sort_descending: bool,
 }
@@ -104,7 +104,6 @@ impl App {
             last_wake_refresh: Instant::now(),
             no_ble,
             save_allowed,
-            table_height: 180.0,
             sort_column: 1,
             sort_descending: false,
         }
@@ -138,7 +137,7 @@ impl App {
         if ids.is_empty() {
             return;
         }
-        if action.writes() {
+        if matches!(action, Action::Channel(_)) {
             self.pending = Some((ids, action));
         } else {
             self.send(Request::Run(ids, action));
@@ -311,17 +310,33 @@ impl App {
                     (PowerCommand::Standby, lang.text(s::STANDBY)),
                     (PowerCommand::Sleep, lang.text(s::SLEEP)),
                 ] {
-                    if ui.button(label).clicked() {
+                    if appearance::button(
+                        ui,
+                        label,
+                        match command {
+                            PowerCommand::On => Icon::Power,
+                            PowerCommand::Standby => Icon::Moon,
+                            PowerCommand::Sleep => Icon::Sleep,
+                        },
+                        false,
+                    )
+                    .clicked()
+                    {
                         self.action(ids.to_vec(), Action::Power(command));
                     }
                 }
                 if ui
-                    .add_enabled(ids.len() == 1, egui::Button::new(lang.text(s::IDENTIFY)))
+                    .add_enabled_ui(ids.len() == 1, |ui| {
+                        appearance::button(ui, lang.text(s::IDENTIFY), Icon::Identify, false)
+                    })
+                    .inner
                     .clicked()
                 {
                     self.action(ids.to_vec(), Action::Identify);
                 }
-                if ui.button(lang.text(s::REFRESH_STATUS)).clicked() {
+                if appearance::button(ui, lang.text(s::REFRESH_STATUS), Icon::Refresh, false)
+                    .clicked()
+                {
                     self.action(ids.to_vec(), Action::Refresh);
                 }
             });
@@ -337,6 +352,8 @@ impl App {
             .id(egui::Id::unique("settings-window"))
             .open(&mut open)
             .default_width(530.0)
+            .vscroll(true)
+            .max_height((ctx.input(|i| i.content_rect().height()) - 100.0).max(300.0))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(lang.text(s::LANGUAGE));
@@ -402,7 +419,7 @@ impl App {
                     });
                 }
                 if self.registration.is_some() {
-                    ui.spinner();
+                    ui.spinner().on_hover_text(lang.text(s::WORKING));
                 }
                 ui.label(lang.text(s::OPTIONAL_ABSOLUTE_PATH_TO_THE_OFFICIAL_OPENVR_LIBRARY));
                 ui.text_edit_singleline(&mut self.config.openvr_library);
@@ -564,188 +581,189 @@ impl eframe::App for App {
     fn ui(&mut self, root: &mut egui::Ui, _: &mut eframe::Frame) {
         let ctx = root.ctx().clone();
         let lang = self.config.language;
-        for theme in [egui::Theme::Dark, egui::Theme::Light] {
-            let mut style = (*ctx.style_of(theme)).clone();
-            style.spacing.interact_size.y = 28.0;
-            style.spacing.button_padding.y = 5.0;
-            ctx.set_style_of(theme, style);
-        }
+        appearance::style(&ctx);
         ctx.set_theme(match self.config.theme {
             1 => egui::ThemePreference::Dark,
             2 => egui::ThemePreference::Light,
             _ => egui::ThemePreference::System,
         });
-        egui::CentralPanel::default().show(root, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading("Basestation Tool");
-                ui.label(RichText::new("LIGHTHOUSE / BLE").small().weak());
-                if self.busy {
-                    ui.spinner();
-                    ui.label(lang.text(s::WORKING));
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let response = ui.button(format!("     {}", lang.text(s::SETTINGS)));
-                    // Draw the icon ourselves so it cannot become a missing-font rectangle.
-                    let center = egui::pos2(response.rect.left() + 13.0, response.rect.center().y);
-                    let color = ui.visuals().text_color();
-                    let points = (0..32)
-                        .map(|i| {
-                            let angle = i as f32 * std::f32::consts::TAU / 32.0;
-                            let radius = if i % 4 == 0 || i % 4 == 3 { 7.0 } else { 9.0 };
-                            center + egui::vec2(angle.cos(), angle.sin()) * radius
-                        })
-                        .collect();
-                    ui.painter().add(egui::Shape::closed_line(
-                        points,
-                        egui::Stroke::new(1.3, color),
-                    ));
-                    ui.painter()
-                        .circle_stroke(center, 3.0, egui::Stroke::new(1.3, color));
-                    if response.clicked() {
-                        self.settings = !self.settings;
-                    }
-                });
-            });
-            ui.horizontal_wrapped(|ui| {
-                ui.add_enabled_ui(!self.busy && !self.no_ble, |ui| {
-                    if ui.button(lang.text(s::SCAN)).clicked() {
-                        self.last_scan = Instant::now();
-                        self.send(Request::Scan);
-                    }
-                    if ui
-                        .button(lang.text(s::RESET_BLUETOOTH))
+        let visible_rows = self.devices.len().clamp(1, 5);
+        let row_height = 34.0;
+        let table_height = visible_rows as f32 * (row_height + 10.0) - 10.0;
+        let minimum_height = 340.0
+            + table_height
+            + if self.show_logs { 170.0 } else { 0.0 }
+            + if self.selected.len() == 1 { 170.0 } else { 0.0 }
+            + if self.no_ble || !self.notice.is_empty() || !self.save_allowed {
+                40.0
+            } else {
+                0.0
+            };
+        ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(
+            820.0,
+            minimum_height,
+        )));
+        if let Some(rect) = ctx.input(|i| i.viewport().inner_rect)
+            && (rect.width() < 820.0 || rect.height() < minimum_height)
+        {
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
+                rect.width().max(820.0),
+                rect.height().max(minimum_height),
+            )));
+        }
+        appearance::resize_edges(root);
+        appearance::title_bar(root);
+        egui::CentralPanel::default()
+            .frame(
+                egui::Frame::new()
+                    .fill(root.visuals().panel_fill)
+                    .inner_margin(20),
+            )
+            .show(root, |ui| {
+                ui.horizontal(|ui| {
+                    ui.add_enabled_ui(!self.busy && !self.no_ble, |ui| {
+                        if appearance::button(ui, lang.text(s::SCAN), Icon::Scan, true).clicked() {
+                            self.last_scan = Instant::now();
+                            self.send(Request::Scan);
+                        }
+                        if appearance::button(
+                            ui,
+                            lang.text(s::RESET_BLUETOOTH),
+                            Icon::Refresh,
+                            false,
+                        )
                         .on_hover_text(lang.text(s::RESETS_ONLY_THIS_APPLICATION_S_CONNECTIONS))
                         .clicked()
-                    {
-                        self.send(Request::Reset);
+                        {
+                            self.send(Request::Reset);
+                        }
+                    });
+                    ui.label(RichText::new("LIGHTHOUSE / BLE").small().weak());
+                    if self.busy {
+                        ui.spinner().on_hover_text(lang.text(s::WORKING));
                     }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if appearance::button(ui, lang.text(s::SETTINGS), Icon::Settings, false)
+                            .clicked()
+                        {
+                            self.settings = !self.settings;
+                        }
+                    });
                 });
-            });
-            ui.separator();
-            if self.no_ble {
-                ui.colored_label(
-                    ui.visuals().warn_fg_color,
-                    lang.text(s::BLE_DISABLED_UI_TEST),
-                );
-            }
-            if !self.save_allowed {
-                ui.colored_label(
-                    ui.visuals().warn_fg_color,
-                    lang.text(s::INVALID_CONFIGURATION_ORIGINAL_RETAINED_SAVING_DISABLED),
-                );
-            }
-            if !self.notice.is_empty() {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(&self.notice);
-                    if ui.small_button("×").clicked() {
-                        self.notice.clear();
+                ui.separator();
+                if self.no_ble {
+                    ui.colored_label(
+                        ui.visuals().warn_fg_color,
+                        lang.text(s::BLE_DISABLED_UI_TEST),
+                    );
+                }
+                if !self.save_allowed {
+                    ui.colored_label(
+                        ui.visuals().warn_fg_color,
+                        lang.text(s::INVALID_CONFIGURATION_ORIGINAL_RETAINED_SAVING_DISABLED),
+                    );
+                }
+                if !self.notice.is_empty() {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(&self.notice);
+                        if ui.small_button("×").clicked() {
+                            self.notice.clear();
+                        }
+                    });
+                }
+                ui.horizontal(|ui| {
+                    if ui.button(lang.text(s::SELECT_ALL)).clicked() {
+                        self.selected = self.devices.keys().cloned().collect();
                     }
+                    if ui.button(lang.text(s::CLEAR_SELECTION)).clicked() {
+                        self.selected.clear();
+                    }
+                    ui.label(format!(
+                        "{}: {}/{}",
+                        lang.text(s::SELECTED_LABEL),
+                        self.selected.len(),
+                        self.devices.len()
+                    ));
+                    ui.label(format!(
+                        "SteamVR: {}",
+                        lang.text(if self.steam_running {
+                            s::RUNNING
+                        } else {
+                            s::STOPPED
+                        })
+                    ));
                 });
-            }
-            ui.horizontal(|ui| {
-                if ui.button(lang.text(s::SELECT_ALL)).clicked() {
-                    self.selected = self.devices.keys().cloned().collect();
-                }
-                if ui.button(lang.text(s::CLEAR_SELECTION)).clicked() {
-                    self.selected.clear();
-                }
-                ui.label(format!(
-                    "{}: {}/{}",
-                    lang.text(s::SELECTED_LABEL),
-                    self.selected.len(),
-                    self.devices.len()
-                ));
-                ui.label(format!(
-                    "SteamVR: {}",
-                    lang.text(if self.steam_running {
-                        s::RUNNING
+                let mut ids: Vec<_> = self.devices.keys().cloned().collect();
+                ids.sort_by(|a, b| {
+                    let left = &self.devices[a];
+                    let right = &self.devices[b];
+                    let order = match self.sort_column {
+                        0 => self.selected.contains(a).cmp(&self.selected.contains(b)),
+                        1 => left
+                            .display_name()
+                            .to_lowercase()
+                            .cmp(&right.display_name().to_lowercase()),
+                        2 => left
+                            .known
+                            .name
+                            .to_lowercase()
+                            .cmp(&right.known.name.to_lowercase()),
+                        3 => (left.online, left.busy, left.status.to_string()).cmp(&(
+                            right.online,
+                            right.busy,
+                            right.status.to_string(),
+                        )),
+                        4 => left.channel.cmp(&right.channel),
+                        5 => left.rssi.cmp(&right.rssi),
+                        _ => left.known.address.cmp(&right.known.address),
+                    };
+                    let order = if self.sort_descending {
+                        order.reverse()
                     } else {
-                        s::STOPPED
-                    })
-                ));
-            });
-            let mut ids: Vec<_> = self.devices.keys().cloned().collect();
-            ids.sort_by(|a, b| {
-                let left = &self.devices[a];
-                let right = &self.devices[b];
-                let order = match self.sort_column {
-                    0 => self.selected.contains(a).cmp(&self.selected.contains(b)),
-                    1 => left
-                        .display_name()
-                        .to_lowercase()
-                        .cmp(&right.display_name().to_lowercase()),
-                    2 => left
-                        .known
-                        .name
-                        .to_lowercase()
-                        .cmp(&right.known.name.to_lowercase()),
-                    3 => (left.online, left.busy, left.status.to_string()).cmp(&(
-                        right.online,
-                        right.busy,
-                        right.status.to_string(),
-                    )),
-                    4 => left.channel.cmp(&right.channel),
-                    5 => left.rssi.cmp(&right.rssi),
-                    _ => left.known.address.cmp(&right.known.address),
-                };
-                let order = if self.sort_descending {
-                    order.reverse()
-                } else {
-                    order
-                };
-                order.then_with(|| a.cmp(b))
-            });
-            let controls_height = if self.selected.len() == 1 {
-                240.0
-            } else {
-                125.0
-            };
-            let max_height = (ui.available_height()
-                - controls_height
-                - if self.show_logs { 110.0 } else { 0.0 })
-            .max(70.0);
-            let height = if self.show_logs {
-                self.table_height.clamp(70.0, max_height)
-            } else {
-                max_height
-            };
-            egui::ScrollArea::horizontal()
-                .id_salt("device-horizontal-scroll")
-                .show(ui, |ui| {
-                    TableBuilder::new(ui)
-                        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                        .striped(true)
-                        .resizable(true)
-                        .min_scrolled_height(height)
-                        .max_scroll_height(height)
-                        .auto_shrink([false, false])
-                        .column(Column::initial(75.0).at_least(65.0))
-                        .column(Column::initial(140.0))
-                        .column(Column::initial(150.0))
-                        .column(Column::initial(165.0))
-                        .column(Column::initial(90.0).at_least(85.0))
-                        .column(Column::initial(90.0))
-                        .column(Column::initial(170.0))
-                        .header(30.0, |mut h| {
-                            for (column, label) in [
-                                lang.text(s::SELECT),
-                                lang.text(s::NAME),
-                                "Bluetooth",
-                                lang.text(s::STATE_CONNECTION),
-                                lang.text(s::CHANNEL),
-                                "RSSI",
-                                lang.text(s::ADDRESS),
-                            ]
-                            .into_iter()
-                            .enumerate()
-                            {
-                                h.col(|ui| {
-                                    let suffix = if self.sort_column == column {
-                                        if self.sort_descending { " v" } else { " ^" }
-                                    } else {
-                                        ""
-                                    };
-                                    if ui
+                        order
+                    };
+                    order.then_with(|| a.cmp(b))
+                });
+                egui::Frame::group(ui.style())
+                    .inner_margin(6)
+                    .show(ui, |ui| {
+                        egui::ScrollArea::horizontal()
+                            .id_salt("device-horizontal-scroll")
+                            .show(ui, |ui| {
+                                TableBuilder::new(ui)
+                                    .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                                    .striped(true)
+                                    .resizable(true)
+                                    .min_scrolled_height(table_height)
+                                    .max_scroll_height(table_height)
+                                    .auto_shrink([false, false])
+                                    .column(Column::initial(75.0).at_least(65.0))
+                                    .column(Column::initial(140.0))
+                                    .column(Column::initial(150.0))
+                                    .column(Column::initial(165.0))
+                                    .column(Column::initial(90.0).at_least(85.0))
+                                    .column(Column::initial(90.0))
+                                    .column(Column::initial(170.0))
+                                    .header(30.0, |mut h| {
+                                        for (column, label) in [
+                                            lang.text(s::SELECT),
+                                            lang.text(s::NAME),
+                                            "Bluetooth",
+                                            lang.text(s::STATE_CONNECTION),
+                                            lang.text(s::CHANNEL),
+                                            "RSSI",
+                                            lang.text(s::ADDRESS),
+                                        ]
+                                        .into_iter()
+                                        .enumerate()
+                                        {
+                                            h.col(|ui| {
+                                                let suffix = if self.sort_column == column {
+                                                    if self.sort_descending { " v" } else { " ^" }
+                                                } else {
+                                                    ""
+                                                };
+                                                if ui
                                         .selectable_label(
                                             self.sort_column == column,
                                             format!("{label}{suffix}"),
@@ -764,240 +782,244 @@ impl eframe::App for App {
                                             self.sort_descending = false;
                                         }
                                     }
-                                });
-                            }
-                        })
-                        .body(|body| {
-                            body.rows(30.0, ids.len(), |mut row| {
-                                let id = &ids[row.index()];
-                                let d = self.devices.get_mut(id).unwrap();
-                                row.set_selected(self.selected.contains(id));
-                                row.col(|ui| {
-                                    let mut checked = self.selected.contains(id);
-                                    if ui.checkbox(&mut checked, "").changed() {
-                                        if checked {
-                                            self.selected.insert(id.clone());
-                                        } else {
-                                            self.selected.remove(id);
+                                            });
                                         }
-                                    }
-                                });
-                                row.col(|ui| {
-                                    if ui
-                                        .selectable_label(
-                                            self.selected.contains(id),
-                                            d.display_name(),
-                                        )
-                                        .on_hover_text(lang.text(s::SELECT_ONLY_THIS_STATION))
-                                        .clicked()
-                                    {
-                                        self.selected.clear();
-                                        self.selected.insert(id.clone());
-                                    }
-                                });
-                                row.col(|ui| {
-                                    ui.label(&d.known.name);
-                                });
-                                row.col(|ui| {
-                                    let text = if let Status::On(b) = d.status
-                                        && d.spinning_up()
-                                    {
-                                        format!("{} (0x{b:02X})", lang.text(s::SPINNING_UP))
-                                    } else if d.busy {
-                                        lang.text(s::CHECKING).to_owned()
-                                    } else if !d.online {
-                                        lang.text(s::OFFLINE).into()
-                                    } else {
-                                        match d.status {
-                                            Status::Unavailable => lang.text(s::UNAVAILABLE).into(),
-                                            Status::On(b) => {
-                                                format!("{} (0x{b:02X})", lang.text(s::ON_STATUS))
-                                            }
-                                            Status::Unknown(b) => {
-                                                format!("{} (0x{b:02X})", lang.text(s::UNKNOWN))
-                                            }
-                                            Status::Standby => lang.text(s::STANDBY).into(),
-                                            Status::Sleep => lang.text(s::SLEEP).into(),
-                                        }
-                                    };
-                                    let color = if d.error.is_some() {
-                                        Color32::from_rgb(220, 135, 65)
-                                    } else {
-                                        ui.visuals().text_color()
-                                    };
-                                    ui.colored_label(color, text).on_hover_text(
-                                        d.error.clone().unwrap_or_else(|| {
-                                            format!(
-                                                "{}: {}",
-                                                lang.text(s::CONNECTED),
-                                                lang.text(if d.connected { s::YES } else { s::NO })
-                                            )
-                                        }),
-                                    );
-                                });
-                                row.col(|ui| {
-                                    ui.label(
-                                        d.channel
-                                            .map(|v| v.to_string())
-                                            .unwrap_or_else(|| "—".into()),
-                                    );
-                                });
-                                row.col(|ui| {
-                                    ui.label(
-                                        d.rssi
-                                            .map(|v| format!("{v} dBm"))
-                                            .unwrap_or_else(|| "—".into()),
-                                    )
-                                    .on_hover_text(format!(
-                                        "{}: {}",
-                                        lang.text(s::LAST_SCAN_LABEL),
-                                        d.seen.as_deref().unwrap_or("—")
-                                    ));
-                                });
-                                row.col(|ui| {
-                                    ui.label(&d.known.address).on_hover_text(id);
-                                });
-                            })
-                        });
-                });
-            if self.show_logs {
-                ui.add_space(12.0);
-                let (rect, response) = ui.allocate_exact_size(
-                    egui::vec2(ui.available_width(), 16.0),
-                    egui::Sense::drag(),
-                );
-                let response = response
-                    .on_hover_cursor(egui::CursorIcon::ResizeVertical)
-                    .on_hover_text(lang.text(s::DRAG_TO_RESIZE_DEVICE_LIST_AND_LOG));
-                let color = if response.hovered() || response.dragged() {
-                    ui.visuals().text_color()
-                } else {
-                    ui.visuals().widgets.noninteractive.bg_stroke.color
-                };
-                ui.painter().hline(
-                    rect.x_range(),
-                    rect.center().y,
-                    egui::Stroke::new(1.0, color),
-                );
-                ui.painter().hline(
-                    (rect.center().x - 20.0)..=(rect.center().x + 20.0),
-                    rect.center().y,
-                    egui::Stroke::new(3.0, color),
-                );
-                if response.dragged() {
-                    self.table_height =
-                        (height + ui.input(|i| i.pointer.delta().y)).clamp(70.0, max_height);
-                }
-            }
-            if self.devices.is_empty() {
-                ui.label(lang.text(s::NO_STATIONS_FOUND_ENABLE_BLUETOOTH_AND_START_A_SCAN));
-            }
-            ui.separator();
-            let targets = if self.selected.len() == 1 {
-                device::targets(&self.devices, Scope::One(self.selected.first().unwrap()))
-            } else {
-                device::targets(&self.devices, Scope::Selected(&self.selected))
-            };
-            ui.group(|ui| {
-                ui.set_min_width(ui.available_width());
-                self.controls(ui, &targets);
-                if let [single] = targets.as_slice() {
-                    ui.separator();
-                    let id = single.clone();
-                    ui.horizontal_wrapped(|ui| {
-                        if let Some(d) = self.devices.get_mut(&id) {
-                            ui.label(lang.text(s::LOCAL_NAME));
-                            ui.add(
-                                egui::TextEdit::singleline(&mut d.known.alias)
-                                    .desired_width(130.0)
-                                    .hint_text(&d.known.name),
-                            );
-                        }
-                        if ui.button(lang.text(s::SAVE)).clicked() {
-                            self.persist();
-                        }
-                    });
-                    ui.horizontal_wrapped(|ui| {
-                        ui.label(lang.text(s::CHANNEL_LABEL));
-                        egui::ComboBox::from_id_salt("channel")
-                            .selected_text(self.channel.to_string())
-                            .show_ui(ui, |ui| {
-                                for n in 1..=16 {
-                                    ui.selectable_value(&mut self.channel, n, n.to_string());
-                                }
+                                    })
+                                    .body(|body| {
+                                        body.rows(row_height, ids.len(), |mut row| {
+                                            let id = &ids[row.index()];
+                                            let d = self.devices.get_mut(id).unwrap();
+                                            row.set_selected(self.selected.contains(id));
+                                            row.col(|ui| {
+                                                let mut checked = self.selected.contains(id);
+                                                if ui.checkbox(&mut checked, "").changed() {
+                                                    if checked {
+                                                        self.selected.insert(id.clone());
+                                                    } else {
+                                                        self.selected.remove(id);
+                                                    }
+                                                }
+                                            });
+                                            row.col(|ui| {
+                                                if ui
+                                                    .selectable_label(
+                                                        self.selected.contains(id),
+                                                        d.display_name(),
+                                                    )
+                                                    .on_hover_text(
+                                                        lang.text(s::SELECT_ONLY_THIS_STATION),
+                                                    )
+                                                    .clicked()
+                                                {
+                                                    self.selected.clear();
+                                                    self.selected.insert(id.clone());
+                                                }
+                                            });
+                                            row.col(|ui| {
+                                                ui.label(&d.known.name);
+                                            });
+                                            row.col(|ui| {
+                                                let text = if let Status::On(b) = d.status
+                                                    && d.spinning_up()
+                                                {
+                                                    format!(
+                                                        "{} (0x{b:02X})",
+                                                        lang.text(s::SPINNING_UP)
+                                                    )
+                                                } else if d.busy {
+                                                    lang.text(s::CHECKING).to_owned()
+                                                } else if !d.online {
+                                                    lang.text(s::OFFLINE).into()
+                                                } else {
+                                                    match d.status {
+                                                        Status::Unavailable => {
+                                                            lang.text(s::UNAVAILABLE).into()
+                                                        }
+                                                        Status::On(b) => {
+                                                            format!(
+                                                                "{} (0x{b:02X})",
+                                                                lang.text(s::ON_STATUS)
+                                                            )
+                                                        }
+                                                        Status::Unknown(b) => {
+                                                            format!(
+                                                                "{} (0x{b:02X})",
+                                                                lang.text(s::UNKNOWN)
+                                                            )
+                                                        }
+                                                        Status::Standby => {
+                                                            lang.text(s::STANDBY).into()
+                                                        }
+                                                        Status::Sleep => lang.text(s::SLEEP).into(),
+                                                    }
+                                                };
+                                                let color = if d.error.is_some() {
+                                                    Color32::from_rgb(220, 135, 65)
+                                                } else {
+                                                    ui.visuals().text_color()
+                                                };
+                                                ui.colored_label(color, text).on_hover_text(
+                                                    d.error.clone().unwrap_or_else(|| {
+                                                        format!(
+                                                            "{}: {}",
+                                                            lang.text(s::CONNECTED),
+                                                            lang.text(if d.connected {
+                                                                s::YES
+                                                            } else {
+                                                                s::NO
+                                                            })
+                                                        )
+                                                    }),
+                                                );
+                                            });
+                                            row.col(|ui| {
+                                                ui.label(
+                                                    d.channel
+                                                        .map(|v| v.to_string())
+                                                        .unwrap_or_else(|| "—".into()),
+                                                );
+                                            });
+                                            row.col(|ui| {
+                                                ui.label(
+                                                    d.rssi
+                                                        .map(|v| format!("{v} dBm"))
+                                                        .unwrap_or_else(|| "—".into()),
+                                                )
+                                                .on_hover_text(format!(
+                                                    "{}: {}",
+                                                    lang.text(s::LAST_SCAN_LABEL),
+                                                    d.seen.as_deref().unwrap_or("—")
+                                                ));
+                                            });
+                                            row.col(|ui| {
+                                                ui.label(&d.known.address).on_hover_text(id);
+                                            });
+                                        })
+                                    });
                             });
-                        let supported = self.devices.get(&id).is_some_and(|d| d.supported);
-                        if ui
-                            .add_enabled(
-                                !self.busy && supported && !self.no_ble,
-                                egui::Button::new(lang.text(s::CHANGE_CHANNEL)),
-                            )
+                    });
+                if self.devices.is_empty() {
+                    ui.label(lang.text(s::NO_STATIONS_FOUND_ENABLE_BLUETOOTH_AND_START_A_SCAN));
+                }
+                ui.separator();
+                let targets = if self.selected.len() == 1 {
+                    device::targets(&self.devices, Scope::One(self.selected.first().unwrap()))
+                } else {
+                    device::targets(&self.devices, Scope::Selected(&self.selected))
+                };
+                ui.group(|ui| {
+                    ui.set_min_width(ui.available_width());
+                    self.controls(ui, &targets);
+                    if let [single] = targets.as_slice() {
+                        ui.separator();
+                        let id = single.clone();
+                        ui.horizontal_wrapped(|ui| {
+                            if let Some(d) = self.devices.get_mut(&id) {
+                                ui.label(lang.text(s::LOCAL_NAME));
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut d.known.alias)
+                                        .desired_width(130.0)
+                                        .hint_text(&d.known.name),
+                                );
+                            }
+                            if ui.button(lang.text(s::SAVE)).clicked() {
+                                self.persist();
+                            }
+                        });
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(lang.text(s::CHANNEL_LABEL));
+                            egui::ComboBox::from_id_salt("channel")
+                                .selected_text(self.channel.to_string())
+                                .show_ui(ui, |ui| {
+                                    for n in 1..=16 {
+                                        ui.selectable_value(&mut self.channel, n, n.to_string());
+                                    }
+                                });
+                            let supported = self.devices.get(&id).is_some_and(|d| d.supported);
+                            if ui
+                                .add_enabled(
+                                    !self.busy && supported && !self.no_ble,
+                                    egui::Button::new(lang.text(s::CHANGE_CHANNEL)),
+                                )
+                                .clicked()
+                            {
+                                self.action(
+                                    vec![id.clone()],
+                                    Action::Channel(Channel::new(self.channel).unwrap()),
+                                );
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button(lang.text(s::DIAGNOSTICS)).clicked() {
+                                self.diagnosis = Some(id.clone());
+                                if !self.busy {
+                                    self.action(vec![id], Action::Diagnose);
+                                }
+                            }
+                        });
+                    }
+                });
+                if self.show_logs {
+                    ui.separator();
+                    ui.horizontal_wrapped(|ui| {
+                        ui.strong(lang.text(s::LOG));
+                        if appearance::button(ui, lang.text(s::CLEAR), Icon::Clear, false).clicked()
+                        {
+                            self.logs.entries.clear();
+                        }
+                        if appearance::button(ui, lang.text(s::SAVE_EXPORT), Icon::Save, false)
                             .clicked()
                         {
-                            self.action(
-                                vec![id.clone()],
-                                Action::Channel(Channel::new(self.channel).unwrap()),
-                            );
+                            self.export("log", &self.logs.full_text());
                         }
+                        ui.add(
+                            egui::TextEdit::singleline(&mut self.search)
+                                .desired_width(170.0)
+                                .hint_text(lang.text(s::SEARCH)),
+                        );
+                        egui::ComboBox::from_id_salt("level")
+                            .selected_text(if self.level.is_empty() {
+                                lang.text(s::ALL_LEVELS)
+                            } else {
+                                &self.level
+                            })
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.level,
+                                    String::new(),
+                                    lang.text(s::ALL),
+                                );
+                                for l in ["Debug", "Info", "Warning", "Error"] {
+                                    ui.selectable_value(&mut self.level, l.into(), l);
+                                }
+                            });
                     });
-                    ui.horizontal(|ui| {
-                        if ui.button(lang.text(s::DIAGNOSTICS)).clicked() {
-                            self.diagnosis = Some(id.clone());
-                            if !self.busy {
-                                self.action(vec![id], Action::Diagnose);
-                            }
-                        }
-                    });
+                    if let Some(error) = &self.logs.disk_error {
+                        ui.colored_label(ui.visuals().warn_fg_color, error);
+                    }
+                    egui::Frame::group(ui.style())
+                        .inner_margin(10)
+                        .show(ui, |ui| {
+                            egui::ScrollArea::vertical()
+                                .id_salt("log-scroll")
+                                .stick_to_bottom(true)
+                                .auto_shrink([false, false])
+                                .max_height(ui.available_height().max(30.0))
+                                .show(ui, |ui| {
+                                    for e in &self.logs.entries {
+                                        if (self.level.is_empty() || self.level == e.level)
+                                            && (self.config.debug || e.level != "Debug")
+                                            && e.line
+                                                .to_lowercase()
+                                                .contains(&self.search.to_lowercase())
+                                        {
+                                            ui.label(RichText::new(&e.line).monospace().size(12.0));
+                                        }
+                                    }
+                                });
+                        });
                 }
             });
-            if self.show_logs {
-                ui.separator();
-                ui.horizontal_wrapped(|ui| {
-                    ui.strong(lang.text(s::LOG));
-                    if ui.button(lang.text(s::CLEAR)).clicked() {
-                        self.logs.entries.clear();
-                    }
-                    if ui.button(lang.text(s::SAVE_EXPORT)).clicked() {
-                        self.export("log", &self.logs.full_text());
-                    }
-                    ui.add(
-                        egui::TextEdit::singleline(&mut self.search)
-                            .desired_width(170.0)
-                            .hint_text(lang.text(s::SEARCH)),
-                    );
-                    egui::ComboBox::from_id_salt("level")
-                        .selected_text(if self.level.is_empty() {
-                            lang.text(s::ALL_LEVELS)
-                        } else {
-                            &self.level
-                        })
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.level, String::new(), lang.text(s::ALL));
-                            for l in ["Debug", "Info", "Warning", "Error"] {
-                                ui.selectable_value(&mut self.level, l.into(), l);
-                            }
-                        });
-                });
-                if let Some(error) = &self.logs.disk_error {
-                    ui.colored_label(ui.visuals().warn_fg_color, error);
-                }
-                egui::ScrollArea::vertical()
-                    .id_salt("log-scroll")
-                    .stick_to_bottom(true)
-                    .auto_shrink([false, false])
-                    .max_height(ui.available_height().max(30.0))
-                    .show(ui, |ui| {
-                        for e in &self.logs.entries {
-                            if (self.level.is_empty() || self.level == e.level)
-                                && (self.config.debug || e.level != "Debug")
-                                && e.line.to_lowercase().contains(&self.search.to_lowercase())
-                            {
-                                ui.label(RichText::new(&e.line).monospace().size(12.0));
-                            }
-                        }
-                    });
-            }
-        });
         self.settings(&ctx);
         self.diagnosis(&ctx);
         self.confirmation(&ctx);

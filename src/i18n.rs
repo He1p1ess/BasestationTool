@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Language {
-    #[default]
     De,
+    #[default]
     En,
     Fr,
     Es,
@@ -370,13 +370,6 @@ pub mod strings {
         "Dernière recherche",
         "Última búsqueda",
         "Ultima ricerca",
-    ];
-    pub const DRAG_TO_RESIZE_DEVICE_LIST_AND_LOG: [&str; 5] = [
-        "Ziehen: Höhe von Geräteliste und Log ändern",
-        "Drag to resize device list and log",
-        "Faites glisser pour redimensionner la liste et le journal",
-        "Arrastra para ajustar la lista y el registro",
-        "Trascina per ridimensionare elenco e registro",
     ];
     pub const NO_STATIONS_FOUND_ENABLE_BLUETOOTH_AND_START_A_SCAN: [&str; 5] = [
         "Keine Stationen gefunden. Bluetooth aktivieren und Suche starten.",

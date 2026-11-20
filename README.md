@@ -4,22 +4,22 @@ Control Valve and HTC Lighthouse base stations individually or as a group over B
 
 Basestation Tool is a native Rust desktop application built with egui. Windows 11 and Linux share the same application core. The Linux Bluetooth backend uses btleplug and BlueZ. Most of the project code was generated with AI.
 
-## Installation (v0.1.1)
+## Installation (v0.1.2)
 
 [Download the Windows and Linux packages from GitHub Releases](https://github.com/He1p1ess/BasestationTool/releases/latest). Each release package has a SHA-256 checksum listed in `SHA256SUMS.txt`.
 
 | Platform | Package | How to launch |
 | --- | --- | --- |
-| Windows x64 | MSI installer | Double-click `Basestation-Tool-0.1.1-x64.msi`. It installs for the current user. Open **Basestation Tool** from the Start menu. The installer is unsigned. |
-| Windows x64 | Portable EXE | Save `Basestation-Tool-0.1.1-x64.exe` in a permanent folder and double-click it. If you move the executable or switch to the installed version, register SteamVR autostart again. |
-| Debian or Ubuntu amd64 | DEB | In the download folder, run `sudo apt install ./basestation-tool_0.1.1_amd64.deb`. Launch it from the application menu or run `basestation-tool`. |
-| Linux x86-64 | AppImage | Save the AppImage in a permanent folder. Run `chmod +x Basestation-Tool-0.1.1-x86_64.AppImage`, then `./Basestation-Tool-0.1.1-x86_64.AppImage`. If FUSE is unavailable, run `./Basestation-Tool-0.1.1-x86_64.AppImage --appimage-extract-and-run`. |
+| Windows x64 | MSI installer | Double-click `Basestation-Tool-0.1.2-x64.msi`. It installs for the current user. Open **Basestation Tool** from the Start menu. The installer is unsigned. |
+| Windows x64 | Portable EXE | Save `Basestation-Tool-0.1.2-x64.exe` in a permanent folder and double-click it. If you move the executable or switch to the installed version, register SteamVR autostart again. |
+| Debian or Ubuntu amd64 | DEB | In the download folder, run `sudo apt install ./basestation-tool_0.1.2_amd64.deb`. Launch it from the application menu or run `basestation-tool`. |
+| Linux x86-64 | AppImage | Save the AppImage in a permanent folder. Run `chmod +x Basestation-Tool-0.1.2-x86_64.AppImage`, then `./Basestation-Tool-0.1.2-x86_64.AppImage`. If FUSE is unavailable, run `./Basestation-Tool-0.1.2-x86_64.AppImage --appimage-extract-and-run`. |
 
 You need a Bluetooth LE adapter with working drivers. Linux also requires a graphical session, glibc 2.31 or later, graphics libraries, D-Bus and BlueZ.
 
 ## First launch
 
-Connect your stations to power, enable Bluetooth and open the app. By default, it scans for nearby stations and reads their status and channel. A normal launch only reads device data. Manual power and channel changes show a confirmation dialog listing the target stations. Automatic SteamVR power actions are off by default.
+Connect your stations to power, enable Bluetooth and open the app. By default, it scans for nearby stations and reads their status and channel. A normal launch only reads device data. Manual power actions and Identify run immediately for the displayed selection. Channel changes show a confirmation dialog listing the target station. Automatic SteamVR power actions are off by default.
 
 Only one instance runs per user. A second instance exits immediately.
 
@@ -31,7 +31,7 @@ Only one instance runs per user. A second instance exits immediately.
 - **Manage one station.** Select exactly one station to edit its local display name, set its channel or open diagnostics. Renaming affects only the name shown in the app. On a supported LHB station, choose a channel from 1 to 16 and confirm. The app reads the channel back from the station and displays that value.
 - **Read diagnostics.** Inspect GATT services, characteristics, properties, hex values and validated text, including the manufacturer, model, serial number and firmware. You can refresh, select and copy text, or export the full report.
 - **Read signal strength.** RSSI shows the last signal strength observed during a scan, in dBm. Hover for the observation time. A dash means that no reading is available. RSSI is not a distance measurement.
-- **Arrange the table and log.** Click a column heading to sort and click again to reverse the order. Channel and RSSI sort numerically. Selections follow device IDs when rows move. Drag column boundaries to resize them, or scroll horizontally in a narrow window. With the log visible, drag the divider beneath the table to resize both areas. Increasing the window height gives the log more room.
+- **Arrange the table and log.** Click a column heading to sort and click again to reverse the order. Channel and RSSI sort numerically. Selections follow device IDs when rows move. Drag column boundaries to resize them, or scroll horizontally in a narrow window. The table fits the number of stations, up to five visible rows, with vertical scrolling for additional stations. The window grows as needed to keep the log and single-device controls visible. You can resize it manually above the minimum content size. Increasing the window height gives the log more room.
 - **Inspect and export logs.** Search the live log, filter by level, clear it or save it. BLE debugging includes byte values. Technical log messages and GATT data use English in every interface language. The app keeps up to 2,000 entries in memory and rotates the current log plus four older files at about 2 MB each. Exporting a log or diagnostic report opens the destination folder and displays the full file path.
 - **Reset Bluetooth.** This closes the app's connections and reinitializes scanning. The system adapter stays enabled and Windows settings are preserved.
 - **Change preferences.** Open the gear in the upper-right corner for **Language**, **Show log**, appearance (system, dark or light), scanning, logging and SteamVR options. The interface supports German, English, French, Spanish and Italian. eframe remembers the window size and position.

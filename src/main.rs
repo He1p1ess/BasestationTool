@@ -1,4 +1,5 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+mod appearance;
 mod ble;
 mod config;
 mod control;
@@ -40,8 +41,9 @@ fn main() -> eframe::Result<()> {
     let no_ble = std::env::args().any(|a| a == "--no-ble");
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_inner_size([1100.0, 760.0])
-            .with_min_inner_size([720.0, 580.0]),
+            .with_decorations(false)
+            .with_inner_size([1100.0, 700.0])
+            .with_min_inner_size([820.0, 500.0]),
         ..Default::default()
     };
     eframe::run_native(
